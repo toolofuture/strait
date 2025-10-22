@@ -1,12 +1,1 @@
-streamlit
-openai
-anthropic
-google-generativeai
-opencv-python
-Pillow
-numpy
-pandas
-plotly
-requests
-python-dotenv
-scikit-image
+streamlit>=1.28.0
