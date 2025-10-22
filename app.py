@@ -89,7 +89,7 @@ def analyze_with_ai(image, model_name):
         if model_name == "GPT-4" and openai_client:
             # OpenAI GPT-4 Vision 분석
             response = openai_client.chat.completions.create(
-                model="gpt-4-vision-preview",
+                model="gpt-4o",
                 messages=[
                     {
                         "role": "user",
