@@ -7,9 +7,11 @@ import plotly.graph_objects as go
 from datetime import datetime
 import requests
 from dotenv import load_dotenv
-import openai
+from openai import OpenAI
 import anthropic
 import google.generativeai as genai
+import base64
+from io import BytesIO
 
 # 환경변수 로드
 load_dotenv()
@@ -20,14 +22,19 @@ ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY')
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
 
 # 클라이언트 초기화
+openai_client = None
+anthropic_client = None
+gemini_model = None
+
 if OPENAI_API_KEY:
-    openai.api_key = OPENAI_API_KEY
+    openai_client = OpenAI(api_key=OPENAI_API_KEY)
 
 if ANTHROPIC_API_KEY:
     anthropic_client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
 if GOOGLE_API_KEY:
     genai.configure(api_key=GOOGLE_API_KEY)
+    gemini_model = genai.GenerativeModel('gemini-pro-vision')
 
 # 페이지 설정
 st.set_page_config(
@@ -44,17 +51,17 @@ st.markdown("**AI가 미술품의 진위를 판단하고 스스로 학습하는 
 with st.sidebar:
     st.header("🔑 API 키 상태")
     
-    if OPENAI_API_KEY:
+    if OPENAI_API_KEY and openai_client:
         st.success("✅ OpenAI API 키 설정됨")
     else:
         st.error("❌ OpenAI API 키 없음")
     
-    if ANTHROPIC_API_KEY:
+    if ANTHROPIC_API_KEY and anthropic_client:
         st.success("✅ Anthropic API 키 설정됨")
     else:
         st.error("❌ Anthropic API 키 없음")
     
-    if GOOGLE_API_KEY:
+    if GOOGLE_API_KEY and gemini_model:
         st.success("✅ Google API 키 설정됨")
     else:
         st.error("❌ Google API 키 없음")
@@ -79,9 +86,9 @@ with st.sidebar:
 def analyze_with_ai(image, model_name):
     """실제 AI API를 사용한 분석"""
     try:
-        if model_name == "GPT-4" and OPENAI_API_KEY:
-            # OpenAI GPT-4 분석
-            response = openai.ChatCompletion.create(
+        if model_name == "GPT-4" and openai_client:
+            # OpenAI GPT-4 Vision 분석
+            response = openai_client.chat.completions.create(
                 model="gpt-4-vision-preview",
                 messages=[
                     {
@@ -104,7 +111,7 @@ def analyze_with_ai(image, model_name):
             )
             return response.choices[0].message.content
             
-        elif model_name == "Claude-3" and ANTHROPIC_API_KEY:
+        elif model_name == "Claude-3" and anthropic_client:
             # Anthropic Claude 분석
             response = anthropic_client.messages.create(
                 model="claude-3-sonnet-20240229",
@@ -118,12 +125,11 @@ def analyze_with_ai(image, model_name):
             )
             return response.content[0].text
             
-        elif model_name == "Gemini-Pro" and GOOGLE_API_KEY:
+        elif model_name == "Gemini-Pro" and gemini_model:
             # Google Gemini 분석
-            model = genai.GenerativeModel('gemini-pro-vision')
-            response = model.generate_content([
+            response = gemini_model.generate_content([
                 "이 미술품의 진위를 분석해주세요. JSON 형식으로 답변해주세요.",
-                image
+                Image.open(BytesIO(base64.b64decode(image)))
             ])
             return response.text
             
@@ -155,9 +161,6 @@ with col1:
         if st.button("🔍 AI 분석 시작", type="primary"):
             with st.spinner("AI가 작품을 분석 중입니다..."):
                 # 이미지를 base64로 변환
-                import base64
-                from io import BytesIO
-                
                 buffered = BytesIO()
                 image.save(buffered, format="JPEG")
                 img_str = base64.b64encode(buffered.getvalue()).decode()
